@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Free search mini",
+    "description": "Adds a small free_search tool with Firecrawl (optional key), Bing RSS, DuckDuckGo HTML, and Wikipedia fallback. Open this plugin's page to set a Firecrawl key."
+  }
+}
