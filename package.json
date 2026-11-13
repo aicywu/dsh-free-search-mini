@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "description": "A small, keyless-first web search tool for DeepSeek Harness.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aicywu/dsh-free-search-mini.git"
+  },
+  "homepage": "https://github.com/aicywu/dsh-free-search-mini",
   "icon": "./icon.svg",
   "exports": {
     ".": "./index.js",
