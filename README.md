@@ -6,7 +6,7 @@ A small, keyless-first `free_search` tool for DeepSeek Harness. It does not use 
 
 In `auto` mode the tool tries:
 
-1. **Firecrawl** — only when a Firecrawl API key is configured. Firecrawl's keyless mode may reject proxy/VPN exit IPs; a free key (1,000 credits/month at the time of writing) avoids that.
+1. **Firecrawl** — always tried first. With `firecrawlApiKey` set it uses that key; without one it tries Firecrawl's keyless tier. Keyless mode may reject proxy/VPN exit IPs; a free key (1,000 credits/month at the time of writing) avoids that.
 2. **Bing RSS** — no key, no registration.
 3. **DuckDuckGo HTML** — no key, no registration; may rate-limit.
 4. **Wikipedia** — no key; searches encyclopedia articles, not the general web. Chinese queries use `zh.wikipedia.org`, others use `en.wikipedia.org`.

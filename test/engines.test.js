@@ -103,17 +103,63 @@ test('parseFirecrawlJson accepts the v2 web result shape', () => {
   assert.equal(sources[0].title, 'DeepSeek Harness')
 })
 
-test('runFallback uses Bing when Firecrawl has no key and returns its results', async () => {
+test('runFallback tries Firecrawl keyless before Bing when no key is configured', async () => {
+  const calls = []
   const result = await runFallback({
     query: 'DeepSeek Harness',
     maxResults: 10,
     source: 'auto',
     firecrawlApiKey: '',
-    fetchImpl: async url => new Response(BING_RSS, { status: 200 }),
+    fetchImpl: async (url) => {
+      calls.push(String(url))
+      if (String(url).includes('firecrawl.dev')) {
+        return new Response(JSON.stringify(FIRECRAWL_JSON), { status: 200 })
+      }
+      return new Response(BING_RSS, { status: 200 })
+    },
+  })
+  assert.equal(result.engine, 'firecrawl')
+  assert.equal(result.sources.length, 1)
+  assert.equal(calls[0].includes('firecrawl.dev'), true)
+  assert.deepEqual(result.errors, [])
+})
+
+test('runFallback tries Firecrawl without an Authorization header when no key is configured', async () => {
+  let request
+  await runFallback({
+    query: 'DeepSeek Harness',
+    maxResults: 10,
+    source: 'firecrawl',
+    firecrawlApiKey: '',
+    fetchImpl: async (url, options) => {
+      request = { url: String(url), options }
+      return new Response(JSON.stringify(FIRECRAWL_JSON), { status: 200 })
+    },
+  })
+  assert.equal(request.url.includes('firecrawl.dev'), true)
+  assert.equal(request.options.headers.authorization, undefined)
+})
+
+test('runFallback falls back to Bing when keyless Firecrawl is refused', async () => {
+  const calls = []
+  const result = await runFallback({
+    query: 'DeepSeek Harness',
+    maxResults: 10,
+    source: 'auto',
+    firecrawlApiKey: '',
+    fetchImpl: async (url) => {
+      calls.push(String(url))
+      if (String(url).includes('firecrawl.dev')) {
+        return new Response(JSON.stringify({ success: false, error: 'IP looks like a VPN or proxy' }), { status: 403 })
+      }
+      return new Response(BING_RSS, { status: 200 })
+    },
   })
   assert.equal(result.engine, 'bing')
   assert.equal(result.sources.length, 2)
-  assert.deepEqual(result.errors, [])
+  assert.equal(result.errors[0].engine, 'firecrawl')
+  assert.match(result.errors[0].message, /403/)
+  assert.equal(calls[0].includes('firecrawl.dev'), true)
 })
 
 test('runFallback falls back to DuckDuckGo when Bing fails', async () => {
@@ -129,7 +175,8 @@ test('runFallback falls back to DuckDuckGo when Bing fails', async () => {
   })
   assert.equal(result.engine, 'ddg')
   assert.equal(result.sources.length, 2)
-  assert.equal(result.errors[0].engine, 'bing')
+  assert.equal(result.errors[0].engine, 'firecrawl')
+  assert.equal(result.errors[1].engine, 'bing')
 })
 
 test('runFallback reports every engine failure when all engines fail', async () => {

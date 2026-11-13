@@ -76,7 +76,7 @@ export function apply(ctx, config) {
   ctx.tools.register({
     name: 'free_search',
     description:
-      'Search the web for free. Uses Firecrawl when a key is configured, then Bing RSS, DuckDuckGo HTML, and Wikipedia as fallbacks. Returns source titles, URLs, and snippets.',
+      'Search the web for free. Tries Firecrawl first (keyless when no key is set), then Bing RSS, DuckDuckGo HTML, and Wikipedia as fallbacks. Returns source titles, URLs, and snippets.',
     parameters: {
       type: 'object',
       properties: {
@@ -93,7 +93,7 @@ export function apply(ctx, config) {
         source: {
           type: 'string',
           enum: ['auto', 'firecrawl', 'bing', 'ddg', 'wiki'],
-          description: 'Engine to use. auto tries Firecrawl (only with a key), then Bing, DuckDuckGo, and Wikipedia.',
+          description: 'Engine to use. auto tries Firecrawl first (keyless when no key is set), then Bing, DuckDuckGo, and Wikipedia.',
         },
       },
       required: ['query'],
