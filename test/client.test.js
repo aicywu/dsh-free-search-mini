@@ -47,4 +47,15 @@ test('bundle config form renders without the owner form prop', async () => {
   const tree = captured[0].component({ view: 'page', t: key => key })
   assert.equal(tree.type, 'div')
   assert.notEqual(tree.props.children[0].props.children, 'Configuration is unavailable in this profile.')
+
+  // The secret field is never sent back to the browser, so configured state is
+  // unknown here. The clear action must still be offered.
+  const buttonLabels = []
+  const walk = (node) => {
+    if (node === null || typeof node !== 'object') return
+    if (node.type === 'button') buttonLabels.push(...node.props.children.filter(child => typeof child === 'string'))
+    for (const child of node.props.children ?? []) walk(child)
+  }
+  walk(tree)
+  assert.ok(buttonLabels.includes('clear'))
 })

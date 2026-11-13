@@ -93,7 +93,7 @@ export function apply(ctx, config) {
         source: {
           type: 'string',
           enum: ['auto', 'firecrawl', 'bing', 'ddg', 'wiki'],
-          description: 'Engine to use. auto tries Firecrawl first (keyless when no key is set), then Bing, DuckDuckGo, and Wikipedia.',
+          description: 'Engine preference. auto and firecrawl use Firecrawl → Bing → DuckDuckGo → Wikipedia; bing, ddg, and wiki use only that engine.',
         },
       },
       required: ['query'],

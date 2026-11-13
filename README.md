@@ -22,7 +22,7 @@ Every engine is bounded by `timeoutMs`. A failed or empty engine falls through t
 | `maxResults` | `10` | Default result cap (1–20). |
 | `timeoutMs` | `12000` | Per-engine timeout in milliseconds. |
 
-The Firecrawl key is never hardcoded. To set it, open **Plugins → Installed → dsh-free-search-mini** and use the **Firecrawl API key** form on the bundle page. Alternatively set `FIRECRAWL_API_KEY` in the launch environment. To share the plugin, leave `firecrawlApiKey` empty and let each user fill their own key.
+The Firecrawl key is never hardcoded. To set it, open **Plugins → Installed → dsh-free-search-mini** and use the **Firecrawl API key** form on the bundle page. The form also has a **Clear key** action; the saved key is never echoed back. Alternatively set `FIRECRAWL_API_KEY` in the launch environment. To share the plugin, leave `firecrawlApiKey` empty and let each user fill their own key.
 
 For local sharing, copy the package folder and run `pnpm install` in it (the only runtime dependency is `@deepseek-ai/schemastery`). For npm publishing, remove `"private": true` first.
 
@@ -36,7 +36,7 @@ The tool accepts:
 
 - `query` — required search text.
 - `maxResults` — optional 1–20 cap.
-- `source` — `auto` (default), `firecrawl`, `bing`, `ddg`, or `wiki`.
+- `source` — `auto` (default), `firecrawl`, `bing`, `ddg`, or `wiki`. `auto` and `firecrawl` use the full Firecrawl → Bing → DuckDuckGo → Wikipedia chain; `bing`/`ddg`/`wiki` use only that engine.
 
 Search results are external, untrusted data. Use `web_fetch` to read a specific result URL.
 

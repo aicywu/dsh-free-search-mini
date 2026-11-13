@@ -140,6 +140,28 @@ test('runFallback tries Firecrawl without an Authorization header when no key is
   assert.equal(request.options.headers.authorization, undefined)
 })
 
+test('runFallback falls back to Bing when an explicit firecrawl source has an invalid key', async () => {
+  const calls = []
+  const result = await runFallback({
+    query: 'DeepSeek Harness',
+    maxResults: 10,
+    source: 'firecrawl',
+    firecrawlApiKey: 'bad-key',
+    fetchImpl: async (url) => {
+      calls.push(String(url))
+      if (String(url).includes('firecrawl.dev')) {
+        return new Response(JSON.stringify({ success: false, error: 'Unauthorized: Invalid token' }), { status: 401 })
+      }
+      return new Response(BING_RSS, { status: 200 })
+    },
+  })
+  assert.equal(result.engine, 'bing')
+  assert.equal(result.sources.length, 2)
+  assert.equal(result.errors[0].engine, 'firecrawl')
+  assert.match(result.errors[0].message, /401/)
+  assert.equal(calls[0].includes('firecrawl.dev'), true)
+})
+
 test('runFallback falls back to Bing when keyless Firecrawl is refused', async () => {
   const calls = []
   const result = await runFallback({

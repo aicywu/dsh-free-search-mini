@@ -18,8 +18,7 @@ window.__ModuleLoader__.load({
       title: 'Firecrawl API key',
       hint: 'Optional. Without a key the tool tries Firecrawl keyless first, then Bing RSS, DuckDuckGo HTML and Wikipedia. Leave blank to keep an existing key.',
       placeholder: 'fc-...',
-      configured: 'A Firecrawl key is configured.',
-      notConfigured: 'No Firecrawl key is configured; Firecrawl keyless is tried first.',
+      statusHint: 'The key is write-only: leaving this blank keeps an existing key; Clear removes it.',
       save: 'Save',
       saving: 'Saving...',
       saved: 'Saved.',
@@ -34,8 +33,7 @@ window.__ModuleLoader__.load({
       title: 'Firecrawl API Key',
       hint: '可选。不填时先尝试 Firecrawl keyless，再回退到 Bing RSS、DuckDuckGo HTML 和 Wikipedia。留空表示保持已有 Key 不变。',
       placeholder: 'fc-...',
-      configured: '已配置 Firecrawl Key。',
-      notConfigured: '尚未配置 Firecrawl Key，将先尝试 Firecrawl keyless。',
+      statusHint: 'Key 保存后不会回显：留空保存会保留已有 Key，点“清除 Key”可删除。',
       save: '保存',
       saving: '保存中...',
       saved: '已保存。',
@@ -82,9 +80,6 @@ window.__ModuleLoader__.load({
         const [busy, setBusy] = React.useState(false)
         const [message, setMessage] = React.useState('')
 
-        const hasKey = typeof snapshot?.value?.firecrawlApiKey === 'string'
-          && snapshot.value.firecrawlApiKey.length > 0
-
         if (view === 'summary') return h('span', null, t('summary'))
         if (snapshot?.status === 'unavailable') return h('p', null, t('unavailable'))
         if (snapshot?.status === 'loading') return h('p', null, t('loading'))
@@ -129,7 +124,7 @@ window.__ModuleLoader__.load({
         return h('div', { style: { padding: '4px 0' } },
           h('div', { style: { fontWeight: 600, marginBottom: 4 } }, t('title')),
           h('p', { style: { margin: '0 0 8px', opacity: 0.75, fontSize: 13 } }, t('hint')),
-          h('p', { style: { margin: '0 0 8px', fontSize: 13 } }, hasKey ? t('configured') : t('notConfigured')),
+          h('p', { style: { margin: '0 0 8px', opacity: 0.75, fontSize: 13 } }, t('statusHint')),
           h('input', {
             type: 'password',
             value: draft,
@@ -142,7 +137,7 @@ window.__ModuleLoader__.load({
           }),
           h('div', null,
             h('button', { type: 'button', style: buttonStyle, disabled: busy, onClick: save }, busy ? t('saving') : t('save')),
-            hasKey ? h('button', { type: 'button', style: buttonStyle, disabled: busy, onClick: clear }, t('clear')) : null,
+            h('button', { type: 'button', style: buttonStyle, disabled: busy, onClick: clear }, t('clear')),
           ),
           message.length > 0 ? h('p', { style: { margin: '8px 0 0', fontSize: 13, opacity: 0.75 } }, message) : null,
         )

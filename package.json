@@ -1,6 +1,6 @@
 {
   "name": "dsh-free-search-mini",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "description": "A small, keyless-first web search tool for DeepSeek Harness.",
