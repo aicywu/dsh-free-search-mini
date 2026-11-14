@@ -242,7 +242,7 @@ test('runFallback falls back to DuckDuckGo when Bing fails', async () => {
   assert.equal(result.engine, 'ddg')
   assert.equal(result.sources.length, 2)
   assert.equal(result.errors[0].engine, 'firecrawl')
-  assert.equal(result.errors[1].engine, 'bing')
+  assert.ok(result.errors.some(error => error.engine === 'bing'))
 })
 
 test('runFallback reports every engine failure when all engines fail', async () => {
@@ -299,4 +299,107 @@ test('parseSearchArgs applies the configured default result cap', () => {
     maxResults: 7,
     source: 'auto',
   })
+})
+
+test('auto chain tries Tavily after Firecrawl and before Bing', async () => {
+  const calls = []
+  const result = await runFallback({
+    query: 'DeepSeek Harness',
+    maxResults: 10,
+    source: 'auto',
+    firecrawlApiKey: '',
+    tavilyApiKey: '',
+    fetchImpl: async (url) => {
+      calls.push(String(url))
+      if (String(url).includes('firecrawl.dev')) {
+        return new Response(JSON.stringify({ success: false, error: 'no key' }), { status: 403 })
+      }
+      if (String(url).includes('tavily.com')) {
+        return new Response(JSON.stringify(TAVILY_JSON), { status: 200 })
+      }
+      return new Response(BING_RSS, { status: 200 })
+    },
+  })
+  assert.equal(result.engine, 'tavily')
+  assert.equal(result.sources.length, 2)
+  assert.equal(calls[0].includes('firecrawl.dev'), true)
+  assert.equal(calls[1].includes('tavily.com'), true)
+})
+
+test('keyless Tavily request carries the keyless header and no Authorization', async () => {
+  let request
+  await runFallback({
+    query: 'DeepSeek Harness',
+    maxResults: 10,
+    source: 'tavily',
+    tavilyApiKey: '',
+    fetchImpl: async (url, options) => {
+      request = { url: String(url), options }
+      return new Response(JSON.stringify(TAVILY_JSON), { status: 200 })
+    },
+  })
+  assert.equal(request.url.includes('tavily.com'), true)
+  assert.equal(request.options.headers['x-tavily-access-mode'], 'keyless')
+  assert.equal(request.options.headers.authorization, undefined)
+})
+
+test('Tavily with a key uses Bearer authorization and no keyless header', async () => {
+  let request
+  await runFallback({
+    query: 'DeepSeek Harness',
+    maxResults: 10,
+    source: 'tavily',
+    tavilyApiKey: 'tvly-test',
+    fetchImpl: async (url, options) => {
+      request = { url: String(url), options }
+      return new Response(JSON.stringify(TAVILY_JSON), { status: 200 })
+    },
+  })
+  assert.equal(request.options.headers.authorization, 'Bearer tvly-test')
+  assert.equal(request.options.headers['x-tavily-access-mode'], undefined)
+})
+
+test('runFallback falls back to Bing when Tavily keyless quota is exhausted', async () => {
+  const result = await runFallback({
+    query: 'DeepSeek Harness',
+    maxResults: 10,
+    source: 'auto',
+    firecrawlApiKey: '',
+    tavilyApiKey: '',
+    fetchImpl: async (url) => {
+      if (String(url).includes('tavily.com')) {
+        return new Response(JSON.stringify({ detail: { error: 'daily keyless cap reached' } }), { status: 429 })
+      }
+      if (String(url).includes('firecrawl.dev')) {
+        return new Response(JSON.stringify({ success: false, error: 'no key' }), { status: 403 })
+      }
+      return new Response(BING_RSS, { status: 200 })
+    },
+  })
+  assert.equal(result.engine, 'bing')
+  assert.equal(result.sources.length, 2)
+  assert.ok(result.errors.some(error => error.engine === 'tavily' && /429/.test(error.message)))
+})
+
+test('runFallback falls back after an explicitly requested tavily source fails', async () => {
+  const result = await runFallback({
+    query: 'DeepSeek Harness',
+    maxResults: 10,
+    source: 'tavily',
+    tavilyApiKey: 'bad-key',
+    fetchImpl: async (url) => {
+      if (String(url).includes('tavily.com')) {
+        return new Response(JSON.stringify({ detail: { error: 'Unauthorized: missing or invalid API key.' } }), { status: 401 })
+      }
+      return new Response(BING_RSS, { status: 200 })
+    },
+  })
+  assert.equal(result.engine, 'bing')
+  assert.equal(result.sources.length, 2)
+  assert.equal(result.errors[0].engine, 'tavily')
+  assert.match(result.errors[0].message, /401/)
+})
+
+test('parseSearchArgs accepts tavily as a source', () => {
+  assert.equal(parseSearchArgs({ query: 'DeepSeek', source: 'tavily' }).source, 'tavily')
 })
