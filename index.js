@@ -1,10 +1,11 @@
 /**
  * `dsh-free-search-mini` — a small, keyless-first `free_search` tool.
  *
- * Engine order: Firecrawl (only with a key) → Bing RSS → DuckDuckGo HTML →
- * Wikipedia. Each engine is bounded by `timeoutMs`, and `auto` falls back on
- * failure or an empty result. The tool never reads DSH's built-in `web_search`
- * provider, so it does not depend on DeepSeek Search billing.
+ * Engine order: Firecrawl → Tavily → Bing RSS → DuckDuckGo HTML → Wikipedia.
+ * Firecrawl and Tavily use a configured key or their keyless tier. Each engine
+ * is bounded by `timeoutMs`, and `auto` falls back on failure or an empty
+ * result. The tool never reads DSH's built-in `web_search` provider, so it
+ * does not depend on DeepSeek Search billing.
  */
 
 import z from '@deepseek-ai/schemastery'
@@ -26,6 +27,10 @@ export const Config = z.object({
   firecrawlApiKey: z.string().role('secret').volatile(),
   /** Credential reference read through the harness credential center or process environment. */
   firecrawlApiKeyEnv: z.string().role('credential-ref').default('FIRECRAWL_API_KEY').volatile(),
+  /** Optional Tavily API key. Empty falls back to the credential reference below. */
+  tavilyApiKey: z.string().role('secret').volatile(),
+  /** Credential reference for the Tavily key. */
+  tavilyApiKeyEnv: z.string().role('credential-ref').default('TAVILY_API_KEY').volatile(),
   /** Default upper bound on returned sources. */
   maxResults: z.number().step(1).min(1).max(20).default(10).volatile(),
   /** Per-engine timeout in milliseconds. */
@@ -62,6 +67,28 @@ async function resolveFirecrawlKey(ctx, config) {
   return ''
 }
 
+/** Resolve the Tavily key from settings, the credential center, or the environment. */
+async function resolveTavilyKey(ctx, config) {
+  const literal = readSetting(config, 'tavilyApiKey', '')
+  if (typeof literal === 'string' && literal.trim().length > 0) return literal.trim()
+
+  const ref = readSetting(config, 'tavilyApiKeyEnv', 'TAVILY_API_KEY')
+  if (typeof ref === 'string' && ref.length > 0) {
+    const credentials = ctx.get('credentials')
+    if (credentials !== undefined) {
+      try {
+        const resolved = await credentials.resolve(ref)
+        if (typeof resolved?.value === 'string' && resolved.value.length > 0) return resolved.value
+      } catch {
+        // Fall through to the process environment; a missing credential store is not a tool error.
+      }
+    }
+    const ambient = process.env[ref]
+    if (typeof ambient === 'string' && ambient.length > 0) return ambient
+  }
+  return ''
+}
+
 /** Register the model-facing `free_search` tool. */
 export function apply(ctx, config) {
   const maxResults = () => {
@@ -76,7 +103,7 @@ export function apply(ctx, config) {
   ctx.tools.register({
     name: 'free_search',
     description:
-      'Search the web for free. Tries Firecrawl first (keyless when no key is set), then Bing RSS, DuckDuckGo HTML, and Wikipedia as fallbacks. Returns source titles, URLs, and snippets.',
+      'Search the web for free. Tries Firecrawl and Tavily first (keyless when no key is set), then Bing RSS, DuckDuckGo HTML, and Wikipedia as fallbacks. Returns source titles, URLs, and snippets.',
     parameters: {
       type: 'object',
       properties: {
@@ -92,8 +119,8 @@ export function apply(ctx, config) {
         },
         source: {
           type: 'string',
-          enum: ['auto', 'firecrawl', 'bing', 'ddg', 'wiki'],
-          description: 'Engine preference. auto and firecrawl use Firecrawl → Bing → DuckDuckGo → Wikipedia; bing, ddg, and wiki use only that engine.',
+          enum: ['auto', 'firecrawl', 'tavily', 'bing', 'ddg', 'wiki'],
+          description: 'Engine preference. auto uses Firecrawl → Tavily → Bing → DuckDuckGo → Wikipedia; firecrawl and tavily start at that engine and still fall back; bing, ddg, and wiki use only that engine.',
         },
       },
       required: ['query'],
@@ -137,14 +164,18 @@ export function apply(ctx, config) {
       },
       render: (_args, value) => [{ type: 'text', text: formatSearchOutput(value) }],
     },
-    timeoutMs: Math.min(60_000, timeoutMs() * 4 + 5_000),
+    timeoutMs: Math.min(60_000, timeoutMs() * 5 + 5_000),
     isConcurrencySafe: () => true,
     async execute(args, exec) {
       const parsed = parseSearchArgs(args, maxResults())
-      const firecrawlApiKey = await resolveFirecrawlKey(ctx, config)
+      const [firecrawlApiKey, tavilyApiKey] = await Promise.all([
+        resolveFirecrawlKey(ctx, config),
+        resolveTavilyKey(ctx, config),
+      ])
       return await runFallback({
         ...parsed,
         firecrawlApiKey,
+        tavilyApiKey,
         signal: exec.signal,
         timeoutMs: timeoutMs(),
       })
