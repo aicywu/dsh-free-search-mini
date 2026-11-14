@@ -7,6 +7,7 @@ import {
   parseDdgHtml,
   parseFirecrawlJson,
   parseSearchArgs,
+  parseTavilyJson,
   parseWikipediaJson,
   runFallback,
 } from '../lib/engines.js'
@@ -66,6 +67,49 @@ const FIRECRAWL_JSON = {
     ],
   },
 }
+
+const TAVILY_JSON = {
+  query: 'DeepSeek Harness',
+  answer: null,
+  results: [
+    {
+      title: 'What Is DeepSeek Harness?',
+      url: 'https://www.datacamp.com/blog/what-is-deepseek-harness',
+      content: 'DeepSeek Harness is an agent runtime where everything is a plugin.',
+      score: 0.91,
+      published_date: 'Tue, 11 Nov 2026 17:00:00 GMT',
+    },
+    {
+      title: 'DeepSeek Harness (dsh) 教程',
+      url: 'https://deepseekdocs.com/',
+      content: '安装与配置教程。',
+      score: 0.88,
+    },
+  ],
+}
+
+test('parseTavilyJson maps Tavily results into normalized sources', () => {
+  const sources = parseTavilyJson(TAVILY_JSON, 10)
+  assert.equal(sources.length, 2)
+  assert.deepEqual(sources[0], {
+    title: 'What Is DeepSeek Harness?',
+    url: 'https://www.datacamp.com/blog/what-is-deepseek-harness',
+    snippet: 'DeepSeek Harness is an agent runtime where everything is a plugin.',
+    publishedAt: 'Tue, 11 Nov 2026 17:00:00 GMT',
+  })
+  assert.deepEqual(sources[1], {
+    title: 'DeepSeek Harness (dsh) 教程',
+    url: 'https://deepseekdocs.com/',
+    snippet: '安装与配置教程。',
+  })
+})
+
+test('parseTavilyJson ignores the answer field and caps results', () => {
+  const withAnswer = { ...TAVILY_JSON, answer: 'A synthesized answer that must not leak into sources.' }
+  const sources = parseTavilyJson(withAnswer, 1)
+  assert.equal(sources.length, 1)
+  assert.equal(JSON.stringify(sources).includes('synthesized answer'), false)
+})
 
 test('parseBingRss returns normalized sources from an RSS feed', () => {
   const sources = parseBingRss(BING_RSS, 10)
