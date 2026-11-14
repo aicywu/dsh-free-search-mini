@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "免费搜索 Mini",
-    "description": "新增一个小巧的 free_search 工具：Firecrawl（可选 Key，未填时先试 keyless）→ Bing RSS → DuckDuckGo HTML → Wikipedia 自动回退。打开本插件页面即可填写 Firecrawl Key。"
+    "description": "新增一个小巧的 free_search 工具：Firecrawl → Tavily（可选 Key，未填时先试 keyless）→ Bing RSS → DuckDuckGo HTML → Wikipedia 自动回退。打开本插件页面即可填写 API Key。"
   }
 }
