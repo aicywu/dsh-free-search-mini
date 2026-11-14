@@ -403,3 +403,24 @@ test('runFallback falls back after an explicitly requested tavily source fails',
 test('parseSearchArgs accepts tavily as a source', () => {
   assert.equal(parseSearchArgs({ query: 'DeepSeek', source: 'tavily' }).source, 'tavily')
 })
+
+test('Tavily structured errors produce readable messages, never [object Object]', async () => {
+  const body = JSON.stringify({
+    error: { code: 'daily_cap_reached', message: 'You reached the daily keyless Tavily limit.' },
+  })
+  await assert.rejects(
+    runFallback({
+      query: 'Pi Coding Agent',
+      maxResults: 3,
+      source: 'tavily',
+      tavilyApiKey: '',
+      fetchImpl: async () => new Response(body, { status: 429 }),
+    }),
+    (error) => {
+      assert.match(error.message, /daily_cap_reached/)
+      assert.match(error.message, /You reached the daily keyless Tavily limit/)
+      assert.equal(error.message.includes('[object Object]'), false)
+      return true
+    },
+  )
+})
