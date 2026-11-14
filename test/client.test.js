@@ -51,11 +51,16 @@ test('bundle config form renders without the owner form prop', async () => {
   // The secret field is never sent back to the browser, so configured state is
   // unknown here. The clear action must still be offered.
   const buttonLabels = []
+  const inputNames = []
   const walk = (node) => {
     if (node === null || typeof node !== 'object') return
     if (node.type === 'button') buttonLabels.push(...node.props.children.filter(child => typeof child === 'string'))
+    if (node.type === 'input') inputNames.push(node.props.name)
     for (const child of node.props.children ?? []) walk(child)
   }
   walk(tree)
   assert.ok(buttonLabels.includes('clear'))
+  // The single configuration area holds one independent key form per API engine.
+  assert.deepEqual(inputNames, ['firecrawlApiKey', 'tavilyApiKey'])
+  assert.equal(buttonLabels.filter(label => label === 'clear').length, 2)
 })

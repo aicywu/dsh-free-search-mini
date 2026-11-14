@@ -16,9 +16,11 @@ window.__ModuleLoader__.load({
     const en = {
       summary: 'Optional Firecrawl API key',
       title: 'Firecrawl API key',
-      hint: 'Optional. Without a key the tool tries Firecrawl keyless first, then Bing RSS, DuckDuckGo HTML and Wikipedia. Leave blank to keep an existing key.',
-      placeholder: 'fc-...',
-      statusHint: 'The key is write-only: leaving this blank keeps an existing key; Clear removes it.',
+      hint: 'Optional. Without a key the tool tries Firecrawl keyless first, then Tavily, Bing RSS, DuckDuckGo HTML and Wikipedia. Leave blank to keep an existing key.',
+      tavilyTitle: 'Tavily API key',
+      tavilyHint: 'Optional. Without a key the tool tries Tavily keyless first. Keyless has a daily quota; when it is exhausted the tool falls back to other engines.',
+      placeholder: 'fc-... / tvly-...',
+      statusHint: 'Keys are write-only: leaving a field blank keeps an existing key; Clear removes it.',
       save: 'Save',
       saving: 'Saving...',
       saved: 'Saved.',
@@ -31,8 +33,10 @@ window.__ModuleLoader__.load({
     const zh = {
       summary: '可选的 Firecrawl API Key',
       title: 'Firecrawl API Key',
-      hint: '可选。不填时先尝试 Firecrawl keyless，再回退到 Bing RSS、DuckDuckGo HTML 和 Wikipedia。留空表示保持已有 Key 不变。',
-      placeholder: 'fc-...',
+      hint: '可选。不填时先尝试 Firecrawl keyless，再依次尝试 Tavily、Bing RSS、DuckDuckGo HTML 和 Wikipedia。留空表示保持已有 Key 不变。',
+      tavilyTitle: 'Tavily API Key',
+      tavilyHint: '可选。不填时先尝试 Tavily keyless；keyless 有每日额度，用完会自动回退到其他引擎。',
+      placeholder: 'fc-... / tvly-...',
       statusHint: 'Key 保存后不会回显：留空保存会保留已有 Key，点“清除 Key”可删除。',
       save: '保存',
       saving: '保存中...',
@@ -76,70 +80,87 @@ window.__ModuleLoader__.load({
     function makeSettings(configForm) {
       return function FreeSearchSettings({ view, t = key => key }) {
         const snapshot = useFormSnapshot(configForm)
-        const [draft, setDraft] = React.useState('')
-        const [busy, setBusy] = React.useState(false)
-        const [message, setMessage] = React.useState('')
+        // Fixed hook order: one draft, busy flag and message map shared by both
+        // key fields. The fields are rendered as plain elements (not child
+        // components) so the whole form stays in one component.
+        const [firecrawlDraft, setFirecrawlDraft] = React.useState('')
+        const [tavilyDraft, setTavilyDraft] = React.useState('')
+        const [busy, setBusy] = React.useState('')
+        const [messages, setMessages] = React.useState({})
 
         if (view === 'summary') return h('span', null, t('summary'))
         if (snapshot?.status === 'unavailable') return h('p', null, t('unavailable'))
         if (snapshot?.status === 'loading') return h('p', null, t('loading'))
 
-        async function save() {
+        const revision = snapshot?.revision
+        const setFieldMessage = (field, text) => setMessages(previous => ({ ...previous, [field]: text }))
+
+        async function save(field, draft, clearDraft) {
           if (draft.trim().length === 0) {
-            setMessage(t('hint'))
+            setFieldMessage(field, t('hint'))
             return
           }
-          setBusy(true)
-          setMessage('')
+          setBusy(field)
+          setFieldMessage(field, '')
           try {
             const ok = await configForm.mutate(
-              [{ op: 'set', path: ['firecrawlApiKey'], value: draft.trim() }],
-              snapshot.revision,
+              [{ op: 'set', path: [field], value: draft.trim() }],
+              revision,
             )
-            setMessage(ok ? t('saved') : t('saveFailed'))
-            if (ok) setDraft('')
+            setFieldMessage(field, ok ? t('saved') : t('saveFailed'))
+            if (ok) clearDraft('')
           } catch {
-            setMessage(t('saveFailed'))
+            setFieldMessage(field, t('saveFailed'))
           } finally {
-            setBusy(false)
+            setBusy('')
           }
         }
 
-        async function clear() {
-          setBusy(true)
-          setMessage('')
+        async function clear(field) {
+          setBusy(field)
+          setFieldMessage(field, '')
           try {
             const ok = await configForm.mutate(
-              [{ op: 'unset', path: ['firecrawlApiKey'] }],
-              snapshot.revision,
+              [{ op: 'unset', path: [field] }],
+              revision,
             )
-            setMessage(ok ? t('cleared') : t('saveFailed'))
+            setFieldMessage(field, ok ? t('cleared') : t('saveFailed'))
           } catch {
-            setMessage(t('saveFailed'))
+            setFieldMessage(field, t('saveFailed'))
           } finally {
-            setBusy(false)
+            setBusy('')
           }
+        }
+
+        function renderKeyField(field, title, hint, draft, setDraft) {
+          const isBusy = busy === field
+          const message = messages[field] ?? ''
+          return h('div', { key: field, style: { padding: '4px 0 18px' } },
+            h('div', { style: { fontWeight: 600, marginBottom: 4 } }, title),
+            h('p', { style: { margin: '0 0 8px', opacity: 0.75, fontSize: 13 } }, hint),
+            h('p', { style: { margin: '0 0 8px', opacity: 0.75, fontSize: 13 } }, t('statusHint')),
+            h('input', {
+              name: field,
+              type: 'password',
+              value: draft,
+              placeholder: t('placeholder'),
+              autoComplete: 'off',
+              spellCheck: false,
+              style: inputStyle,
+              onChange: event => { setDraft(event.target.value); setFieldMessage(field, '') },
+              onKeyDown: event => { if (event.key === 'Enter') void save(field, draft, setDraft) },
+            }),
+            h('div', null,
+              h('button', { type: 'button', style: buttonStyle, disabled: isBusy, onClick: () => save(field, draft, setDraft) }, isBusy ? t('saving') : t('save')),
+              h('button', { type: 'button', style: buttonStyle, disabled: isBusy, onClick: () => clear(field) }, t('clear')),
+            ),
+            message.length > 0 ? h('p', { style: { margin: '8px 0 0', fontSize: 13, opacity: 0.75 } }, message) : null,
+          )
         }
 
         return h('div', { style: { padding: '4px 0' } },
-          h('div', { style: { fontWeight: 600, marginBottom: 4 } }, t('title')),
-          h('p', { style: { margin: '0 0 8px', opacity: 0.75, fontSize: 13 } }, t('hint')),
-          h('p', { style: { margin: '0 0 8px', opacity: 0.75, fontSize: 13 } }, t('statusHint')),
-          h('input', {
-            type: 'password',
-            value: draft,
-            placeholder: t('placeholder'),
-            autoComplete: 'off',
-            spellCheck: false,
-            style: inputStyle,
-            onChange: event => { setDraft(event.target.value); setMessage('') },
-            onKeyDown: event => { if (event.key === 'Enter') void save() },
-          }),
-          h('div', null,
-            h('button', { type: 'button', style: buttonStyle, disabled: busy, onClick: save }, busy ? t('saving') : t('save')),
-            h('button', { type: 'button', style: buttonStyle, disabled: busy, onClick: clear }, t('clear')),
-          ),
-          message.length > 0 ? h('p', { style: { margin: '8px 0 0', fontSize: 13, opacity: 0.75 } }, message) : null,
+          renderKeyField('firecrawlApiKey', t('title'), t('hint'), firecrawlDraft, setFirecrawlDraft),
+          renderKeyField('tavilyApiKey', t('tavilyTitle'), t('tavilyHint'), tavilyDraft, setTavilyDraft),
         )
       }
     }
